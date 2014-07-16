@@ -271,5 +271,11 @@ class Denon(lib.connection.Client):
         self._items['volume'](vol, 'Denon', self._host)
         
         # extract source
-        source = status.getElementsByTagName('InputFuncSelectMain')[0].getElementsByTagName('value')[0].childNodes[0].nodeValue
-        self._items['source'](source, 'Denon', self._host)
+        element = status.getElementsByTagName('InputFuncSelectMain')
+        if len(element) > 0:
+            source = element[0].getElementsByTagName('value')[0].childNodes[0].nodeValue
+        element = status.getElementsByTagName('InputFuncSelect')
+        if len(element) > 0:
+            source = element[0].getElementsByTagName('value')[0].childNodes[0].nodeValue
+        if source is not None:
+            self._items['source'](source, 'Denon', self._host)
