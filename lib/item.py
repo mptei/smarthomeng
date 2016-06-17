@@ -345,8 +345,8 @@ class Item():
             else:
                 if value is None:
                     logger.info("Item {}: evaluating {} returns None".format(self._path, self._eval))
-                else:
-                    self.__update(value, caller, source, dest)
+                # propagating None is important
+                self.__update(value, caller, source, dest)
 
     def __trigger_logics(self):
         for logic in self.__logics_to_trigger:
