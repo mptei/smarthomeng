@@ -187,6 +187,10 @@ class Scheduler(threading.Thread):
         if name in self._scheduler:
             return self._scheduler[name]['next']
 
+    def return_next_time_value(self, name):
+        if name in self._scheduler:
+            return self._find_next(self._scheduler[name])
+
     def add(self, name, obj, prio=3, cron=None, cycle=None, value=None, offset=None, next=None):
         self._lock.acquire()
         if isinstance(cron, str):
@@ -285,11 +289,9 @@ class Scheduler(threading.Thread):
         else:
             logger.warning("Could not change {0}. No logic/method with this name found.".format(name))
 
-    def _next_time(self, name, offset=None):
-        job = self._scheduler[name]
+    def _find_next(self, job, offset=None):
         if None == job['cron'] == job['cycle']:
-            self._scheduler[name]['next'] = None
-            return
+            return None, None
         next_time = None
         value = None
         now = self._sh.now()
@@ -310,6 +312,10 @@ class Scheduler(threading.Thread):
                 else:
                     next_time = ct
                     value = job['cron'][entry]
+        return next_time, value
+
+    def _next_time(self, name, offset=None):
+        next_time, value = self._find_next(self._scheduler[name], offset)
         self._scheduler[name]['next'] = next_time
         self._scheduler[name]['value'] = value
         if name not in ['Connections', 'series', 'SQLite dump']:
