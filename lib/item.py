@@ -122,18 +122,19 @@ def _fadejob(item, dest, step, delta):
         return
     else:
         item._fading = True
-    if item._value < dest:
-        while (item._value + step) < dest and item._fading:
-            item(item._value + step, 'fader')
-            item._lock.acquire()
-            item._lock.wait(delta)
-            item._lock.release()
-    else:
-        while (item._value - step) > dest and item._fading:
-            item(item._value - step, 'fader')
-            item._lock.acquire()
-            item._lock.wait(delta)
-            item._lock.release()
+    if item._value is not None:
+        if item._value < dest:
+            while (item._value + step) < dest and item._fading:
+                item(item._value + step, 'fader')
+                item._lock.acquire()
+                item._lock.wait(delta)
+                item._lock.release()
+        else:
+            while (item._value - step) > dest and item._fading:
+                item(item._value - step, 'fader')
+                item._lock.acquire()
+                item._lock.wait(delta)
+                item._lock.release()
     if item._fading:
         item._fading = False
         item(dest, 'Fader')
@@ -237,7 +238,7 @@ class Item():
         #############################################################
         # Type
         #############################################################
-        __defaults = {'num': 0, 'str': '', 'bool': False, 'list': [], 'dict': {}, 'foo': None, 'scene': 0}
+        __defaults = {'num': None, 'str': None, 'bool': None, 'list': None, 'dict': None, 'foo': None, 'scene': None}
         if self._type is None:
             logger.debug("Item {}: no type specified.".format(self._path))
             return
@@ -250,11 +251,12 @@ class Item():
         #############################################################
         if self._value is None:
             self._value = __defaults[self._type]
-        try:
-            self._value = self.cast(self._value)
-        except:
-            logger.error("Item {}: value {} does not match type {}.".format(self._path, self._value, self._type))
-            raise
+        if self._value is not None:
+            try:
+                self._value = self.cast(self._value)
+            except:
+                logger.error("Item {}: value {} does not match type {}.".format(self._path, self._value, self._type))
+                raise
         self.__prev_value = self._value
         #############################################################
         # Cache write/init
@@ -351,14 +353,16 @@ class Item():
             logic.trigger('Item', self._path, self._value)
 
     def __update(self, value, caller='Logic', source=None, dest=None):
-        try:
-            value = self.cast(value)
-        except:
+        if not value is None:
+	    # Don't try to cast a None
             try:
-                logger.warning("Item {}: value {} does not match type {}. Via {} {}".format(self._path, value, self._type, caller, source))
+                value = self.cast(value)
             except:
-                pass
-            return
+                try:
+                    logger.warning("Item {}: value {} does not match type {}. Via {} {}".format(self._path, value, self._type, caller, source))
+                except:
+                    pass
+                return
         self._lock.acquire()
         _changed = False
         if value != self._value:
