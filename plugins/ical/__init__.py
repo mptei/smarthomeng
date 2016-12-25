@@ -70,7 +70,9 @@ class iCal():
         delta += 1  # extend delta for negetiv offset
         start = now.replace(hour=23, minute=59, second=59, microsecond=0) + datetime.timedelta(days=offset)
         end = start + datetime.timedelta(days=delta)
+        logger.debug('Time frame for event searching: {0} - {1}'.format(start, end))
         events = self._parse_ical(ical, ics)
+        logger.debug('Read events: {0}'.format(events))
         revents = {}
         for event in events:
             event = events[event]
@@ -120,8 +122,9 @@ class iCal():
         #skip = False
         events = {}
         tzinfo = self._sh.tzinfo()
-        ical = ical.replace('\n', '')
+        #ical = ical.replace('\n', '')
         for line in ical.splitlines():
+            logger.debug('Parse line: {0}'.format(line))
             #if line == 'BEGIN:VTIMEZONE':
             #    skip = True
             #elif line == 'END:VTIMEZONE':
