@@ -245,7 +245,7 @@ class Denon(lib.connection.Client):
 
     # Poll XML status
     def _pollXML(self):
-        con = http.client.HTTPConnection(self._host)
+        con = http.client.HTTPConnection(self._host, timeout=5)
         con.request('GET', "/goform/formMainZone_MainZoneXml.xml")
         resp = con.getresponse()
         con.close()
