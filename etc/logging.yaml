@@ -26,6 +26,8 @@ handlers:
 #    level: DEBUG
 #  plugins.cli:
 #    level: DEBUG
+#  plugins.alexa:
+#    level: DEBUG
 root:
     level: INFO
-    handlers: [file, console]
+    handlers: [file]
