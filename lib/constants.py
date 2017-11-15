@@ -20,7 +20,7 @@
 #########################################################################
 
 #item types
-ITEM_DEFAULTS= __defaults = {'num': 0, 'str': '', 'bool': False, 'list': [], 'dict': {}, 'foo': None, 'scene': 0}
+ITEM_DEFAULTS= __defaults = {'num': None, 'str': None, 'bool': None, 'list': [], 'dict': {}, 'foo': None, 'scene': None}
 ITEM_TYPES=["num","str","bool", "list","dict","foo","scene"]
 FOO = 'foo'
 
