@@ -1207,12 +1207,9 @@ if __name__ == '__main__':
             pass
         atexit.register(readline.write_history_file, histfile)
         readline.parse_and_bind("tab: complete")
-        sh = SmartHome(extern_conf_dir=extern_conf_dir)
-        _sh_thread = threading.Thread(target=sh.start)
-        _sh_thread.start()
         shell = code.InteractiveConsole(locals())
-        shell.interact()
-        exit(0)
+        _sh_thread = threading.Thread(target=shell.interact)
+        _sh_thread.start()
     elif args.logics:
         _reload_logics()
         exit(0)
