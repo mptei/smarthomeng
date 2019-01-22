@@ -365,8 +365,8 @@ class Logics():
         info['name'] = logic.name
         info['enabled'] = logic.enabled
 
-        if self.scheduler.return_next(self._logicname_prefix+logic.name):
-            info['next_exec'] = self.scheduler.return_next(self._logicname_prefix+logic.name).strftime('%Y-%m-%d %H:%M:%S%z')
+        if logic.next_run():
+            info['next_exec'] = logic.next_run().strftime('%Y-%m-%d %H:%M:%S%z')
 
         info['cycle'] = logic.cycle
         info['crontab'] = logic.crontab
@@ -1012,7 +1012,24 @@ class Logic():
         """
 #        self._last_run = self._sh.now()
         self._last_run = self.shtime.now()
+        
+    def next_run(self):
+        """
+        Returns the timestamp of the planned next run of the logic or None (if no run is scheduled)
+        
+        :return: timestamp of next run
+        :rtype: datetime timestamp
+        """
+        return self.scheduler.return_next(self._logicname_prefix+self.name)
 
+    def next_value(self):
+        """
+        Returns the value of the planned next run of the logic or None (if no run is scheduled or no value)
+        
+        :return: value of next run
+        :rtype: str
+        """
+        return self.scheduler.return_next_value(self._logicname_prefix+self.name)
 
     def trigger(self, by='Logic', source=None, value=None, dest=None, dt=None):
         if self.enabled:

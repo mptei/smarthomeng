@@ -289,6 +289,10 @@ class Scheduler(threading.Thread):
         if name in self._scheduler:
             return self._scheduler[name]['next']
 
+    def return_next_value(self, name):
+        if name in self._scheduler:
+            return self._scheduler[name]['value']
+
     def add(self, name, obj, prio=3, cron=None, cycle=None, value=None, offset=None, next=None, from_smartplugin=False):
         """
         Adds an entry to the scheduler.
