@@ -290,7 +290,7 @@ def nested_put(output_dict, path, value):
     return
 
 
-def search_for_struct_in_items(items, template, struct_dict, config, nestlevel=0, parent=''):
+def search_for_struct_in_items(items, struct_dict, config, parent=''):
     '''
     Test if the loaded file contains items with 'struct' attribute.
 
@@ -301,7 +301,6 @@ def search_for_struct_in_items(items, template, struct_dict, config, nestlevel=0
     :return:
     '''
 
-    result = False
     template = collections.OrderedDict()
     for key in items:
         value = items[key]
@@ -322,7 +321,6 @@ def search_for_struct_in_items(items, template, struct_dict, config, nestlevel=0
                 if template != {}:
                     config = merge(template, config)
                     template = collections.OrderedDict()
-            result = True
         else:
             #item is no struct
             if isinstance(value, collections.OrderedDict):
@@ -332,14 +330,8 @@ def search_for_struct_in_items(items, template, struct_dict, config, nestlevel=0
                 else:
                     path = parent+'.'+key
                 # test if a aub-item is a struct
-                if search_for_struct_in_items(value, template, struct_dict, config, nestlevel+1, parent=path):
-                    result = True
-
-#        if nestlevel == 0:
-#            if template != {}:
-#                config = merge(template, config)
-    return result
-
+                search_for_struct_in_items(value, struct_dict, config, parent=path)
+    return
 
 def set_attr_for_subtree(subtree, attr, value, indent=0):
     '''
@@ -485,11 +477,7 @@ def parse_yaml(filename, config=None, addfilenames=False, parseitems=False, stru
         if parseitems:
             # test if file contains 'struct' attribute
             logger.debug("parse_yaml: Checking if file {} contains 'struct' attribute".format(os.path.basename(filename)))
-            items_template = collections.OrderedDict()
-            if search_for_struct_in_items(items, items_template, struct_dict, config):
-                pass
-#                if items_template != {}:
-#                    config = merge(items_template, config)
+            search_for_struct_in_items(items, struct_dict, config)
 
         if addfilenames:
             logger.debug("parse_yaml: Add filename = {} to items".format(os.path.basename(filename)))
