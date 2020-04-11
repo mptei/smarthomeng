@@ -2751,8 +2751,8 @@ def _cache_write(filename, value, cformat=CACHE_FORMAT):
         elif cformat == CACHE_JSON:
             with open(filename, 'w', encoding='UTF-8') as f:
                 json.dump(value,f, default=json_serialize)
-    except IOError:
-        logger.warning("Could not write to {}".format(filename))
+    except IOError as err:
+        logger.warning('I/O error:"{}" writing to "{}"'.format(err, filename))
 
 
 #####################################################################
