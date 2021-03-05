@@ -1410,7 +1410,10 @@ class Item():
         self.__logics_to_trigger.append(logic)
 
     def remove_logic_trigger(self, logic):
-        self.__logics_to_trigger.remove(logic)
+        try:
+            self.__logics_to_trigger.remove(logic)
+        except ValueError:
+            pass # Element is already not on list
 
     def get_logic_triggers(self):
         """
