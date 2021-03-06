@@ -173,10 +173,6 @@ class Mqtt(Module):
             # return
             pass
 
-
-        ip = _get_local_ipv4_address()
-
-
     def start(self):
         """
         This method starts the mqtt module
