@@ -21,6 +21,7 @@
 
 
 import asyncio
+from typing import List
 import janus
 import pathlib
 import ssl
@@ -86,6 +87,7 @@ class Websocket(Module):
         self.sv_acl = 'deny'
         self.sv_querydef = False
         self.sv_ser_upd_cycle = 0
+        self._servers : List[websockets.WebSocketServer] = []
 
         self.ssl_context = None
         if self.use_tls:
@@ -116,6 +118,7 @@ class Websocket(Module):
         self.logics = Logics.get_instance()
 
         self.loop = None    # Var to hold the event loop for asyncio
+        self._shutdown = False # Flag that the module should shut down
 
         # For Release 1.8 only: Enable smartVISU protocol support even if smartvisu plugin is not loaded
         self.set_smartvisu_support(protocol_enabled=True)
@@ -146,7 +149,7 @@ class Websocket(Module):
 
         Otherwise don't enter code here
         """
-        self.logger.info("Shutting down websoocket server(s)...")
+        self.logger.info("Shutting down websocket server(s)...")
         self.loop.call_soon_threadsafe(self.loop.stop)
 
         try:
@@ -213,7 +216,7 @@ class Websocket(Module):
             self.loop.create_task(self.ws_server(self.ip, self.port))
         else:
             self.loop.create_task(self.ws_server(self.ip, self.port), name='ws_server')
-        # self.loop.ensure_future(self.ws_server(self.ip, self.port))
+
         if self.ssl_context is not None:
             if python_version == '3.6':
                 self.loop.ensure_future(self.ws_server(self.ip, self.tls_port, self.ssl_context))
@@ -221,8 +224,6 @@ class Websocket(Module):
                 self.loop.create_task(self.ws_server(self.ip, self.tls_port, self.ssl_context))
             else:
                 self.loop.create_task(self.ws_server(self.ip, self.tls_port, self.ssl_context), name='wss_server')
-
-            # self.loop.ensure_future(self.ws_server(self.ip, self.tls_port, self.ssl_context))
 
         if python_version == '3.6':
             self.loop.ensure_future(self.update_visu())
@@ -234,23 +235,22 @@ class Websocket(Module):
             self.loop.create_task(self.update_visu(), name='update_visu')
             self.loop.create_task(self.update_all_series(), name='update_all_series')
 
-        # self.loop.ensure_future(self.update_visu())
-        # self.loop.ensure_future(self.update_all_series())
-
         try:
             self.loop.run_forever()
         finally:
-            self.logger.warning("_ws_server_thread: finally")
-            try:
-                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
-            except:
-                self.logger.warning("_ws_server_thread: finally *1")
-            self.logger.warning("_ws_server_thread: finally *1x")
-            try:
-                self.loop.close()
-            except:
-                self.logger.warning("_ws_server_thread: finally *2")
-            self.logger.warning("_ws_server_thread: finally *2x")
+            self.logger.debug("_ws_server_thread: finally")
+            self._shutdown = True # Signal the shutdown to the tasks
+            # Close all servers
+            for server in self._servers:
+                server.close()
+
+            # wait for termination of all tasks
+            pending = asyncio.all_tasks(loop = self.loop)
+            self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+            self.loop.close()
+        self.logger.debug("_ws_server_thread: finished")
+
 
     USERS = set()
 
@@ -261,13 +261,13 @@ class Websocket(Module):
         if ssl_context:
             self.logger.info("Secure websocket server started")
             try:
-                await websockets.serve(self.handle_new_connection, ip, port, ssl=ssl_context)
+                self._servers.append(await websockets.serve(self.handle_new_connection, ip, port, ssl=ssl_context))
             except OSError as e:
                 self.logger.error(f"Cannot start secure websocket server - error: {e}")
         else:
             self.logger.info("Websocket server started")
             try:
-                await websockets.serve(self.handle_new_connection, ip, port)
+                self._servers.append(await websockets.serve(self.handle_new_connection, ip, port))
             except OSError as e:
                 self.logger.error(f"Cannot start websocket server - error: {e}")
 
@@ -711,10 +711,12 @@ class Websocket(Module):
         Async task to periodically update the series data for the visu(s)
         """
         while self._sh.shng_status['code'] != 20:
+            if self._shutdown:
+                return
             await asyncio.sleep(1)
 
         self.logger.info("update_all_series: Started")
-        while True:
+        while not self._shutdown:
             remove = []
             series_list = list(self.sv_update_series.keys())
             if series_list != []:
@@ -748,7 +750,6 @@ class Websocket(Module):
             for client_addr in remove:
                 del (self.sv_update_series[client_addr])
 
-            await asyncio.sleep(10)
             if self.sv_ser_upd_cycle > 0:
                 # wait for sv_ser_upd_cycle seconds before running update loop and update all series
                 await asyncio.sleep(self.sv_ser_upd_cycle)
@@ -852,10 +853,10 @@ class Websocket(Module):
         """
         Async task to update the visu(s) if items have changed or an url command has been issued
         """
-        while not self.janus_queue:
+        while not self._shutdown and not self.janus_queue:
             await asyncio.sleep(1)
 
-        while True:
+        while not self._shutdown:
             if self.janus_queue:
                 queue_entry = await self.janus_queue.async_q.get()
                 if queue_entry[0] == 'item':
@@ -886,6 +887,7 @@ class Websocket(Module):
                         self.logger.error("smartVISU_protocol_v4: Exception in 'await websocket.send(url-command)': {}".format(e))
                 else:
                     self.logger.error("update_visu: Unknown queueentry type '{}'".format(queue_entry[0]))
+                    await asyncio.sleep(0)
 
     async def update_item(self, item_name, item_value, source):
         """
