@@ -21,6 +21,7 @@
 
 
 import asyncio
+from asyncio.tasks import Task
 from typing import List
 import janus
 import pathlib
@@ -118,7 +119,6 @@ class Websocket(Module):
         self.logics = Logics.get_instance()
 
         self.loop = None    # Var to hold the event loop for asyncio
-        self._shutdown = False # Flag that the module should shut down
 
         # For Release 1.8 only: Enable smartVISU protocol support even if smartvisu plugin is not loaded
         self.set_smartvisu_support(protocol_enabled=True)
@@ -239,14 +239,19 @@ class Websocket(Module):
             self.loop.run_forever()
         finally:
             self.logger.debug("_ws_server_thread: finally")
-            self._shutdown = True # Signal the shutdown to the tasks
-            # Close all servers
-            for server in self._servers:
-                server.close()
+            # Close all servers to allow proper network termination
+            if self._servers:
+                for server in self._servers:
+                    server.close()
+                pending = [self.loop.create_task(server.wait_closed()) for server in self._servers]
+                self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
 
-            # wait for termination of all tasks
+            # Simply cancel the rest
             pending = asyncio.all_tasks(loop = self.loop)
-            self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+            if pending:
+                for task in pending:
+                    task.cancel()
+                self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
             self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             self.loop.close()
         self.logger.debug("_ws_server_thread: finished")
@@ -711,12 +716,10 @@ class Websocket(Module):
         Async task to periodically update the series data for the visu(s)
         """
         while self._sh.shng_status['code'] != 20:
-            if self._shutdown:
-                return
             await asyncio.sleep(1)
 
         self.logger.info("update_all_series: Started")
-        while not self._shutdown:
+        while True:
             remove = []
             series_list = list(self.sv_update_series.keys())
             if series_list != []:
@@ -750,6 +753,7 @@ class Websocket(Module):
             for client_addr in remove:
                 del (self.sv_update_series[client_addr])
 
+            await asyncio.sleep(10)
             if self.sv_ser_upd_cycle > 0:
                 # wait for sv_ser_upd_cycle seconds before running update loop and update all series
                 await asyncio.sleep(self.sv_ser_upd_cycle)
@@ -853,10 +857,10 @@ class Websocket(Module):
         """
         Async task to update the visu(s) if items have changed or an url command has been issued
         """
-        while not self._shutdown and not self.janus_queue:
+        while not self.janus_queue:
             await asyncio.sleep(1)
 
-        while not self._shutdown:
+        while True:
             if self.janus_queue:
                 queue_entry = await self.janus_queue.async_q.get()
                 if queue_entry[0] == 'item':
@@ -887,7 +891,6 @@ class Websocket(Module):
                         self.logger.error("smartVISU_protocol_v4: Exception in 'await websocket.send(url-command)': {}".format(e))
                 else:
                     self.logger.error("update_visu: Unknown queueentry type '{}'".format(queue_entry[0]))
-                    await asyncio.sleep(0)
 
     async def update_item(self, item_name, item_value, source):
         """
